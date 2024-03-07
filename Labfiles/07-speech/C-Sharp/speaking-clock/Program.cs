@@ -1,7 +1,8 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
-
+using Microsoft.CognitiveServices.Speech;
+using Microsoft.CognitiveServices.Speech.Audio;
 // Import namespaces
 
 
@@ -21,7 +22,11 @@ namespace speaking_clock
                 string aiSvcRegion = configuration["SpeechRegion"];
 
                 // Configure speech service
+                speechConfig = SpeechConfig.FromSubscription(aiSvcKey,aiSvcRegion);
+                Console.WriteLine("Ready to use speech service in " + speechConfig.Region);
 
+                // Configure voice
+                speechConfig.SpeechSynthesisVoiceName = "en-US-AriaNeural";
 
                 // Get spoken input
                 string command = "";
@@ -43,10 +48,25 @@ namespace speaking_clock
             string command = "";
             
             // Configure speech recognition
-
+            using AudioConfig audioConfig =  AudioConfig.FromDefaultMicrophoneInput();
+            using SpeechRecognizer speechRecognizer = new SpeechRecognizer(speechConfig,audioConfig);
+            Console.WriteLine("Speak now...");
 
             // Process speech input
 
+            SpeechRecognitionResult speech = await speechRecognizer.RecognizeOnceAsync();
+            if(speech.Reason == ResultReason.RecognizedSpeech){
+                command = speech.Text;
+                Console.WriteLine(command);
+            }
+            else{
+                Console.WriteLine(speech.Reason);
+                if(speech.Reason == ResultReason.Canceled){
+                    var cancellation = CancellationDetails.FromResult(speech);
+                    Console.WriteLine(cancellation.Reason);
+                    System.Console.WriteLine(cancellation.ErrorDetails);
+                }
+            }
 
             // Return the command
             return command;
@@ -59,9 +79,31 @@ namespace speaking_clock
                         
             // Configure speech synthesis
 
+            speechConfig.SpeechSynthesisVoiceName = "en-GB-LibbyNeural";
+            using SpeechSynthesizer speechSynthesizer = new SpeechSynthesizer(speechConfig);
+
 
             // Synthesize spoken output
 
+            SpeechSynthesisResult speak = await speechSynthesizer.SpeakTextAsync(responseText);
+            if(speak.Reason != ResultReason.SynthesizingAudioCompleted){
+                System.Console.WriteLine(speak.Reason);
+            }
+
+            // Synthesize spoken output
+            string responseSsml = $@"
+                <speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='en-US'>
+                    <voice name='en-GB-LibbyNeural'>
+                        {responseText}
+                        <break strength='weak'/>
+                        Time to end this lab Neeno Xavier!
+                    </voice>
+                </speak>";
+            SpeechSynthesisResult speak2 = await speechSynthesizer.SpeakSsmlAsync(responseSsml);
+            if (speak.Reason != ResultReason.SynthesizingAudioCompleted)
+            {
+                Console.WriteLine(speak.Reason);
+            }
 
             // Print the response
             Console.WriteLine(responseText);
